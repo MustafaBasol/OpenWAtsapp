@@ -43,6 +43,7 @@ services:
       - traefik.http.routers.openwa-api.rule=Host(`openwa-api.autoviseo.com`)
       - traefik.http.routers.openwa-api.entrypoints=websecure
       - traefik.http.routers.openwa-api.tls=true
+      - traefik.http.routers.openwa-api.tls.certresolver=${TRAEFIK_CERTRESOLVER}
       - traefik.http.routers.openwa-api.service=openwa-api-svc
       - traefik.http.services.openwa-api-svc.loadbalancer.server.port=2785
     networks:
@@ -57,6 +58,7 @@ services:
       - traefik.http.routers.openwa-panel.rule=Host(`openwa-panel.autoviseo.com`)
       - traefik.http.routers.openwa-panel.entrypoints=websecure
       - traefik.http.routers.openwa-panel.tls=true
+      - traefik.http.routers.openwa-panel.tls.certresolver=${TRAEFIK_CERTRESOLVER}
       - traefik.http.routers.openwa-panel.service=openwa-panel-svc
       - traefik.http.services.openwa-panel-svc.loadbalancer.server.port=80
       - traefik.http.routers.openwa-panel.middlewares=openwa-panel-auth@docker
@@ -77,6 +79,7 @@ services:
     # No ports published publicly
 
   redis:
+    # Optional service: keep stopped unless REDIS_ENABLED=true in env and needed for queues/caching.
     restart: unless-stopped
     command: sh -c 'if [ -n "$$REDIS_PASSWORD" ]; then redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"; else redis-server --appendonly yes; fi'
     environment:

@@ -10,6 +10,8 @@ Target:
 - Env template: `.env.vps.example`
 
 ## First deployment commands
+> Note: if your Traefik requires an explicit certresolver, set `TRAEFIK_CERTRESOLVER` in `.env.vps`.
+
 ```bash
 # 1) Clone (or pull update)
 git clone https://github.com/rmyndharis/OpenWA.git
@@ -33,6 +35,13 @@ docker compose --env-file .env.vps -f docker-compose.yml -f docker-compose.vps.y
 # 6) Check logs
 docker compose --env-file .env.vps -f docker-compose.yml -f docker-compose.vps.yml logs -f --tail=200
 ```
+
+
+## Persistent writable data with read-only rootfs
+- `openwa-api` runs with `read_only: true` in the VPS override.
+- Persistent writable paths are provided by the base `docker-compose.yml` volume mount:
+  - `openwa-data:/app/data`
+- This is required for WhatsApp session/auth state and media persistence.
 
 ## Must-fill variables in `.env.vps`
 - `DASHBOARD_BASIC_AUTH_USERS`
@@ -63,6 +72,18 @@ docker exec -it openwa-api id
 
 # Confirm NO docker socket mounted
 docker inspect openwa-api --format '{{json .Mounts}}' | jq
+
+
+
+# Verify rendered /app/data mount exists for openwa-api
+docker compose --env-file .env.vps -f docker-compose.yml -f docker-compose.vps.yml config | sed -n '/openwa-api:/,/^[^ ]/p' | grep '/app/data'
+
+# Verify rendered Traefik network name
+docker compose --env-file .env.vps -f docker-compose.yml -f docker-compose.vps.yml config | sed -n '/networks:/,$p' | grep -A2 'traefik-public:'
+
+# Verify DB/Redis ports are NOT published
+docker compose --env-file .env.vps -f docker-compose.yml -f docker-compose.vps.yml config | sed -n '/postgres:/,/^[^ ]/p' | grep -n 'ports:' && echo 'Unexpected postgres ports!' || echo 'OK postgres not published'
+docker compose --env-file .env.vps -f docker-compose.yml -f docker-compose.vps.yml config | sed -n '/redis:/,/^[^ ]/p' | grep -n 'ports:' && echo 'Unexpected redis ports!' || echo 'OK redis not published'
 
 # Confirm no plaintext key file in production
 docker exec -it openwa-api sh -lc 'test ! -f /app/data/.api-key && echo OK_no_plaintext_key_file'
@@ -106,7 +127,8 @@ docker compose --env-file .env.vps -f docker-compose.yml -f docker-compose.vps.y
 ## Backup notes
 - PostgreSQL:
 ```bash
-docker exec -t openwa-postgres pg_dump -U "$DATABASE_USERNAME" "$DATABASE_NAME" > backup_openwa_$(date +%F).sql
+docker compose --env-file .env.vps -f docker-compose.yml -f docker-compose.vps.yml exec -T postgres \
+  pg_dump -U "$DATABASE_USERNAME" "$DATABASE_NAME" > backup_openwa_$(date +%F).sql
 ```
 - WhatsApp session/auth state + media files:
 ```bash
