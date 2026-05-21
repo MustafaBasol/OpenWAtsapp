@@ -1,0 +1,92 @@
+services:
+  openwa-api:
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=2785
+      - BASE_URL=https://openwa-api.autoviseo.com
+      - DASHBOARD_URL=https://openwa-panel.autoviseo.com
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - WS_ALLOWED_ORIGINS=${WS_ALLOWED_ORIGINS}
+      - DATABASE_TYPE=postgres
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=${DATABASE_NAME}
+      - DATABASE_USERNAME=${DATABASE_USERNAME}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
+      - DATABASE_SYNCHRONIZE=false
+      - DATABASE_LOGGING=false
+      - REDIS_ENABLED=${REDIS_ENABLED}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - WEBHOOK_TIMEOUT=10000
+      - WEBHOOK_MAX_RETRIES=3
+      - WEBHOOK_RETRY_DELAY=5000
+      - LOG_LEVEL=${LOG_LEVEL}
+      - ENGINE_TYPE=whatsapp-web.js
+      - SESSION_DATA_PATH=/app/data/sessions
+      - STORAGE_TYPE=local
+      - STORAGE_LOCAL_PATH=/app/data/media
+      - PUPPETEER_HEADLESS=true
+      - PUPPETEER_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${TRAEFIK_NETWORK}
+      - traefik.http.routers.openwa-api.rule=Host(`openwa-api.autoviseo.com`)
+      - traefik.http.routers.openwa-api.entrypoints=websecure
+      - traefik.http.routers.openwa-api.tls=true
+      - traefik.http.routers.openwa-api.tls.certresolver=${TRAEFIK_CERTRESOLVER}
+      - traefik.http.routers.openwa-api.service=openwa-api-svc
+      - traefik.http.services.openwa-api-svc.loadbalancer.server.port=2785
+    networks:
+      - default
+      - traefik-public
+
+  dashboard:
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${TRAEFIK_NETWORK}
+      - traefik.http.routers.openwa-panel.rule=Host(`openwa-panel.autoviseo.com`)
+      - traefik.http.routers.openwa-panel.entrypoints=websecure
+      - traefik.http.routers.openwa-panel.tls=true
+      - traefik.http.routers.openwa-panel.tls.certresolver=${TRAEFIK_CERTRESOLVER}
+      - traefik.http.routers.openwa-panel.service=openwa-panel-svc
+      - traefik.http.services.openwa-panel-svc.loadbalancer.server.port=80
+      - traefik.http.routers.openwa-panel.middlewares=openwa-panel-auth@docker
+      - traefik.http.middlewares.openwa-panel-auth.basicauth.users=${DASHBOARD_BASIC_AUTH_USERS}
+      # Alternative IP allowlist middleware (disabled by default). Uncomment and attach to router if preferred.
+      # - traefik.http.routers.openwa-panel.middlewares=openwa-panel-ipallow@docker
+      # - traefik.http.middlewares.openwa-panel-ipallow.ipallowlist.sourcerange=${DASHBOARD_ALLOWLIST_CIDRS}
+    networks:
+      - default
+      - traefik-public
+
+  postgres:
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DATABASE_USERNAME}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: ${DATABASE_NAME}
+    # No ports published publicly
+
+  redis:
+    # Optional service: keep stopped unless REDIS_ENABLED=true in env and needed for queues/caching.
+    restart: unless-stopped
+    command: sh -c 'if [ -n "$$REDIS_PASSWORD" ]; then redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"; else redis-server --appendonly yes; fi'
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    # No ports published publicly
+
+networks:
+  traefik-public:
+    external: true
+    name: ${TRAEFIK_NETWORK}
