@@ -1,0 +1,21 @@
+services:
+  openwa-api:
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      - NODE_ENV=production
+      - DATABASE_SYNCHRONIZE=false
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - WS_ALLOWED_ORIGINS=${WS_ALLOWED_ORIGINS}
+    volumes:
+      - openwa-data:/app/data
+
+  traefik:
+    command:
+      - --api.dashboard=false

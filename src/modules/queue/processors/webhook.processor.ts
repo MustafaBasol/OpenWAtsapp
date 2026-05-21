@@ -6,6 +6,7 @@ import { createLogger } from '../../../common/services/logger.service';
 import { QUEUE_NAMES } from '../queue-names';
 import { WebhookJobData } from '../../webhook/webhook.service';
 import { Webhook } from '../../webhook/entities/webhook.entity';
+import { fetchWithSafeRedirects } from '../../webhook/utils/safe-webhook-fetch.util';
 import { HookManager } from '../../../core/hooks';
 
 export interface WebhookJobResult {
@@ -48,7 +49,7 @@ export class WebhookProcessor extends WorkerHost {
     };
 
     try {
-      const response = await fetch(url, {
+      const response = await fetchWithSafeRedirects(url, {
         method: 'POST',
         headers: requestHeaders,
         body: JSON.stringify(payload),
