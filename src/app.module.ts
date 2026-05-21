@@ -54,7 +54,7 @@ if (process.env.QUEUE_ENABLED === 'true') {
         type: 'sqlite' as const,
         database: configService.get<string>('database.database', './data/main.sqlite'),
         entities: [__dirname + '/modules/auth/**/*.entity{.ts,.js}', __dirname + '/modules/audit/**/*.entity{.ts,.js}'],
-        synchronize: true,
+        synchronize: false,
         logging: configService.get<boolean>('database.logging', false),
       }),
     }),

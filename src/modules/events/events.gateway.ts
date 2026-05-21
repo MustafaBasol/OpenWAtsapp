@@ -25,7 +25,10 @@ import { SUBSCRIBABLE_EVENTS, buildRoomName } from './dto/ws-messages.dto';
 
 @WebSocketGateway({
   cors: {
-    origin: '*', // In production, restrict this
+    origin: (process.env.WS_ALLOWED_ORIGINS || 'http://localhost:2886')
+      .split(',')
+      .map(o => o.trim())
+      .filter(Boolean)
   },
   namespace: '/events',
 })
@@ -42,8 +45,8 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
   }
 
   async handleConnection(client: Socket) {
-    // Extract API key from header or query param
-    const apiKey = (client.handshake.headers['x-api-key'] as string) || (client.handshake.query.apiKey as string);
+    // Extract API key from header only (do not accept querystring secrets)
+    const apiKey = client.handshake.headers['x-api-key'] as string;
 
     if (!apiKey) {
       this.logger.warn(`Client ${client.id} rejected: No API key provided`);

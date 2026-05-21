@@ -20,6 +20,8 @@ export class AuthService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
+    await this.ensureMainSchemaInitialized();
+
     // Seed a default API key if none exist
     const count = await this.apiKeyRepository.count();
     let displayKey: string;
@@ -33,11 +35,13 @@ export class AuthService implements OnModuleInit {
       await this.seedApiKey(displayKey, 'Default Admin Key', ApiKeyRole.ADMIN);
       isNewKey = true;
 
-      // Save raw key to file for startup script to read
-      try {
-        writeFileSync(API_KEY_FILE, displayKey, 'utf-8');
-      } catch (err) {
-        this.logger.warn('Could not save API key file', { error: String(err) });
+      // Persist plaintext key only in non-production for local development convenience
+      if (process.env.NODE_ENV !== 'production') {
+        try {
+          writeFileSync(API_KEY_FILE, displayKey, 'utf-8');
+        } catch (err) {
+          this.logger.warn('Could not save API key file', { error: String(err) });
+        }
       }
     } else {
       // Read saved API key from file if exists
@@ -65,15 +69,47 @@ export class AuthService implements OnModuleInit {
     this.logger.log(`  📊 Dashboard: ${dashboardUrl}`);
     this.logger.log(`  📚 API Docs:  ${apiBaseUrl}/api/docs`);
     this.logger.log('');
-    if (isNewKey) {
-      this.logger.log('  🔑 API Key (newly created):');
+    if (process.env.NODE_ENV === 'production') {
+      this.logger.log('  🔐 API Key: hidden in production (manage via Dashboard/API)');
     } else {
-      this.logger.log('  🔑 API Key:');
+      if (isNewKey) {
+        this.logger.log('  🔑 API Key (newly created):');
+      } else {
+        this.logger.log('  🔑 API Key:');
+      }
+      this.logger.log(`     ${displayKey}`);
     }
-    this.logger.log(`     ${displayKey}`);
     this.logger.log('');
     this.logger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     this.logger.log('');
+  }
+
+  /**
+   * Production-safe bootstrap for main/auth schema when synchronize=false.
+   * Creates the minimal api_keys table/index if missing.
+   */
+  private async ensureMainSchemaInitialized(): Promise<void> {
+    await this.apiKeyRepository.query(`
+      CREATE TABLE IF NOT EXISTS "api_keys" (
+        "id" varchar PRIMARY KEY NOT NULL,
+        "name" varchar(100) NOT NULL,
+        "keyHash" varchar(64) NOT NULL,
+        "keyPrefix" varchar(8) NOT NULL,
+        "role" varchar(20) NOT NULL DEFAULT ('operator'),
+        "allowedIps" text,
+        "allowedSessions" text,
+        "isActive" boolean NOT NULL DEFAULT (1),
+        "expiresAt" datetime,
+        "lastUsedAt" datetime,
+        "usageCount" integer NOT NULL DEFAULT (0),
+        "createdAt" datetime NOT NULL DEFAULT (datetime('now')),
+        "updatedAt" datetime NOT NULL DEFAULT (datetime('now'))
+      )
+    `);
+
+    await this.apiKeyRepository.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS "IDX_api_keys_keyHash_unique" ON "api_keys" ("keyHash")`,
+    );
   }
 
   private async seedApiKey(rawKey: string, name: string, role: ApiKeyRole): Promise<ApiKey> {
