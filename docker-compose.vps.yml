@@ -29,8 +29,11 @@ services:
       - STORAGE_TYPE=local
       - STORAGE_LOCAL_PATH=/app/data/media
       - PUPPETEER_HEADLESS=true
-      - PUPPETEER_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu
-    read_only: true
+      - HOME=/app/data/chrome-home
+      - XDG_CONFIG_HOME=/app/data/chrome-config
+      - XDG_CACHE_HOME=/app/data/chrome-cache
+      - PUPPETEER_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu,--disable-crash-reporter,--disable-crashpad,--no-first-run,--no-default-browser-check,--user-data-dir=/app/data/chrome-user-data,--crash-dumps-dir=/app/data/chrome-crash
+    read_only: false
     tmpfs:
       - /tmp
     security_opt:
